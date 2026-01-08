@@ -426,7 +426,7 @@ class ModelParser : GedcomParserListener {
                  ValueSetter(getter = { tag.value }, setter = { tag.value = it })
              }
              else if (tos is CharacterSet) ValueSetter(getter = { tos.value }, setter = { tos.value = it })
-             else if (tos is GedcomVersion) ValueSetter(getter = { tos.value }, setter = { tos.value = it })
+             else if (tos is GedcomVersion) ValueSetter(getter = { tos.version }, setter = { tos.version = it }) //TODO supposed to be tos.value??
              else {
                  // Try to be generic or fail?
                  // For now, return a dummy setter or error?
@@ -1304,7 +1304,7 @@ class ModelParser : GedcomParserListener {
                     valueSetter = ValueSetter(getter = { tag.value }, setter = { tag.value = it })
                 }
                 else if (tos is CharacterSet) valueSetter = ValueSetter(getter = { tos.value }, setter = { tos.value = it })
-                else if (tos is GedcomVersion) valueSetter = ValueSetter(getter = { tos.value }, setter = { tos.value = it })
+                else if (tos is GedcomVersion) valueSetter = ValueSetter(getter = { tos.version }, setter = { tos.version = it })
                 // ... add others as needed
 
                 valueSetter?.value = value

@@ -22,6 +22,7 @@ package org.folg.gedcom.model
 class GedcomVersion : ExtensionContainer() {
     var version: String? = null
     var form: String? = null
+    var value: String? = null
 
     override fun accept(visitor: Visitor) {
         if (visitor.visit(this)) {

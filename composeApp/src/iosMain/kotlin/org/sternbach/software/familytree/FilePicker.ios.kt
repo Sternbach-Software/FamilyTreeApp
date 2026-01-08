@@ -2,6 +2,7 @@ package org.sternbach.software.familytree
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import kotlinx.cinterop.ExperimentalForeignApi
 import platform.UIKit.*
 import platform.Foundation.*
 import platform.UniformTypeIdentifiers.*
@@ -19,6 +20,7 @@ class FilePickerLauncherIOS(
     private val onFilePicked: (String?) -> Unit
 ) : FilePickerLauncher {
 
+    @OptIn(ExperimentalForeignApi::class)
     private val delegate = object : NSObject(), UIDocumentPickerDelegateProtocol {
         override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
             val url = didPickDocumentsAtURLs.firstOrNull() as? NSURL
@@ -46,8 +48,9 @@ class FilePickerLauncherIOS(
     }
 
     override fun launch() {
+
         val picker = UIDocumentPickerViewController(
-            forOpeningContentTypes = listOf(UTTypeContent), // Generic content type
+            forOpeningContentTypes = listOf(UTType.typeWithFilenameExtension("ged") ?: UTTypeData),
             asCopy = true
         )
         picker.delegate = delegate

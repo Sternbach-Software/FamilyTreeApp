@@ -23,7 +23,7 @@ class GedcomParser {
 
         for (rawLine in lines) {
             lineNr++
-            
+            println("Parsing $lineNr: $rawLine")
             // remove control chars
             buf.setLength(0)
             for (j in 0 until rawLine.length) {
@@ -80,32 +80,37 @@ class GedcomParser {
                         }
                     }
                 }
-            }
+            } else println("Line is empty")
         }
 
         if (!goodLine) {
+            println("Not good line")
              listener.fatalError("no good lines found in the first 20 lines", lineNr)
         }
-        
+
+//        println("Closing")
         // close remaining tags
-        while (prevLevel >= 0 && stack.isNotEmpty()) { // Close up to GED tag (level -1 logic implied?)
-             // The original logic closed until stack was empty or similar.
+//        while (prevLevel >= 0 && stack.isNotEmpty()) { // Close up to GED tag (level -1 logic implied?)
+//            println("Closing")
+            // The original logic closed until stack was empty or similar.
              // Original: while (thisLevel <= prevLevel) ...
              // At end of loop:
              // contentHandler!!.endElement("", "GED", "GED")
-        }
+//        }
+//        println("Closed")
         
         // Force close all remaining except "GED" which we manually close after loop?
         // Actually original logic pushed "GED" and manually closed it.
         // My logic above pops from stack. "GED" is at bottom.
         // The loop `while (thisLevel <= prevLevel)` handles closing when level drops.
         // But at end of file, we need to close everything back to root.
-        
+        println("Removing")
         while (stack.size > 1) { // Leave "GED"
             val endtag = stack.removeAt(stack.lastIndex)
             listener.endElement(endtag)
+            println("removed tag")
         }
-        
+        println("ended all tags")
         listener.endElement("GED")
         listener.endDocument()
     }

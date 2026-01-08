@@ -160,7 +160,6 @@ private fun FamilyTreeSubcomposer(
 }
 
 // --- Optimized Drawing Logic ---
-
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUnionLines(
     graph: FamilyGraph,
     visibleRect: Rect,
@@ -169,21 +168,21 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUnionLines(
 ) {
     val centerX = nodeWidthPx / 2
     val centerY = nodeHeightPx / 2
-    val unionLineDrop = 40.dp.toPx()
 
+    // Draw lines
     graph.unions.forEach { union ->
-        // Only draw if the union is roughly near the viewport
-        if (!visibleRect.inflate(200f).contains(Offset(union.x, union.y))) return@forEach
+        // Optimization: Skip off-screen unions
+//        if (!visibleRect.inflate(500f).contains(Offset(union.x, union.y))) return@forEach
 
         val spouseIds = union.spouseIds
         if (spouseIds.isEmpty()) return@forEach
 
         val s1 = graph.persons[spouseIds[0]] ?: return@forEach
         val s2 = if (spouseIds.size > 1) graph.persons[spouseIds[1]] else null
-        val unionColor = if (union.isIncestuous) Color.Red else Color.DarkGray
-        val unionStroke = if (union.isIncestuous) 4f else 2f
+        val unionColor = if (union.isIncestuous) Color.Red else Color.Black
+        val unionStroke = if (union.isIncestuous) 4f else 3f
 
-        // 1. Line between spouses
+        // 1. Connector between spouses
         if (s2 != null) {
             drawLine(
                 color = unionColor,
@@ -193,51 +192,50 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUnionLines(
             )
         }
 
-        // 2. Vertical stem from union
-        drawLine(
-            color = unionColor,
-            start = Offset(union.x + centerX, union.y + centerY),
-            end = Offset(union.x + centerX, union.y + unionLineDrop),
-            strokeWidth = unionStroke
-        )
+        // 2. Lines to Children
+        val children = union.childrenIds.mapNotNull { graph.persons[it] }
+        if (children.isNotEmpty()) {
+            val childYTop = children.first().y - 30f // Height of the horizontal bus line
 
-        // 3. Children connectors
-        if (union.childrenIds.isNotEmpty()) {
-            val children = union.childrenIds.mapNotNull { graph.persons[it] }
-            if (children.isNotEmpty()) {
-                val firstX = children.minOf { it.x }
-                val lastX = children.maxOf { it.x }
-                val childYTop = children.first().y - 20.dp.toPx()
+            // Determine bus width (From leftmost child to rightmost child OR union center)
+            val minChildX = children.minOf { it.x }
+            val maxChildX = children.maxOf { it.x }
 
-                // Horizontal connector bar
-                drawLine(
-                    color = Color.Gray,
-                    start = Offset(firstX + centerX, childYTop),
-                    end = Offset(lastX + centerX, childYTop),
-                    strokeWidth = 2f
-                )
+            // Ensure the bus reaches the union stem, even if parents are offset
+            val busLeft = minOf(minChildX, union.x)
+            val busRight = maxOf(maxChildX, union.x)
 
-                // Vertical connector to horizontal bar
+            // Vertical Stem from Union -> Bus
+            drawLine(
+                color = unionColor,
+                start = Offset(union.x + centerX, union.y + centerY),
+                end = Offset(union.x + centerX, childYTop),
+                strokeWidth = unionStroke
+            )
+
+            // Horizontal Bus
+            drawLine(
+                color = unionColor,
+                start = Offset(busLeft + centerX, childYTop),
+                end = Offset(busRight + centerX, childYTop),
+                strokeWidth = 2f
+            )
+
+            // Vertical Stems to Children
+            children.forEach { child ->
+                val isAdopted = s1.adoptiveChildrenIds.contains(child.id) ||
+                        (s2?.adoptiveChildrenIds?.contains(child.id) == true)
+
+                // Dash effect for adoption
+                val pathEffect = if (isAdopted) PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f) else null
+
                 drawLine(
                     color = unionColor,
-                    start = Offset(union.x + centerX, union.y + unionLineDrop),
-                    end = Offset(union.x + centerX, childYTop),
-                    strokeWidth = unionStroke
+                    start = Offset(child.x + centerX, childYTop),
+                    end = Offset(child.x + centerX, child.y),
+                    strokeWidth = 2f,
+                    pathEffect = pathEffect
                 )
-
-                // Individual vertical lines to children
-                children.forEach { child ->
-                    val isAdopted = s1.adoptiveChildrenIds.contains(child.id) ||
-                            (s2?.adoptiveChildrenIds?.contains(child.id) == true)
-
-                    drawLine(
-                        color = Color.Gray,
-                        start = Offset(child.x + centerX, childYTop),
-                        end = Offset(child.x + centerX, child.y),
-                        strokeWidth = 2f,
-                        pathEffect = if (isAdopted) PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f) else null
-                    )
-                }
             }
         }
     }

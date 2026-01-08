@@ -25,6 +25,7 @@ import sternbach.software.familytreecompose.LayoutEngine
 import sternbach.software.familytreecompose.LazyFamilyTree
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import sternbach.software.familytreecompose.FamilyTree
 
 @Composable
 @Preview
@@ -35,15 +36,20 @@ fun App() {
 
         val launcher = rememberFilePicker { content ->
             if (content != null) {
+                println("content: ${content.take(100)}")
                 try {
                     val parser = ModelParser()
                     val gedcom = parser.parseGedcom(content.lineSequence())
+                    println("Parsed GEDCOM: $gedcom")
                     if (gedcom != null) {
+                        println("Mapping to family")
                         val newGraph = GedcomMapper.mapGedcomToFamilyGraph(gedcom)
+                        println("Mapped to family graph")
 
                         val xSpacing = with(density) { 150.dp.toPx() }
                         val ySpacing = with(density) { 160.dp.toPx() }
                         LayoutEngine.calculateLayout(newGraph, xSpacing, ySpacing)
+                        println("Calculated layout")
 
                         graph = newGraph
                     }
