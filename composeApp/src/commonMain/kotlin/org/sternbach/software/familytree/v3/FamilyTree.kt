@@ -1,11 +1,4 @@
-package org.sternbach.software.familytree.v3
-
-import kotlinx.datetime.LocalDate
-import sternbach.software.familytreecompose.FamilyGraph
-import sternbach.software.familytreecompose.LayoutEngine
-import sternbach.software.familytreecompose.Person
-import sternbach.software.familytreecompose.Union
-
+package sternbach.software.familytreecompose
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
@@ -25,6 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlinx.datetime.LocalDate
 
 @Composable
 fun FamilyTree(
@@ -179,10 +173,8 @@ fun FamilyTreePreview() {
     val p2 = Person("2", "Mary", LocalDate(1952, 5, 20))
     val p3 = Person("3", "Child1", LocalDate(1980, 2, 10))
     val p4 = Person("4", "Child2", LocalDate(1985, 6, 15))
-
     val aunt = Person("5", "Aunt", LocalDate(1982, 3, 3))
     val nephew = Person("6", "Nephew", LocalDate(2005, 1, 1))
-
     val adoptedChild = Person("7", "Adopted", LocalDate(2010, 1, 1))
 
     p1.spouseIds.add(p2.id)
@@ -203,11 +195,13 @@ fun FamilyTreePreview() {
     val u2 = Union("u2", listOf(aunt.id, nephew.id), emptyList(), isIncestuous = true)
     // Union for p4 (single parent adoption)
     val u3 = Union("u3", listOf(p4.id), listOf(adoptedChild.id))
+    // Union for p3 (Child1) -> Nephew (single parent biological)
+    val u4 = Union("u4", listOf(p3.id), listOf(nephew.id))
 
     val persons = mapOf(
         p1.id to p1, p2.id to p2, p3.id to p3, p4.id to p4, aunt.id to aunt, nephew.id to nephew, adoptedChild.id to adoptedChild
     )
-    val unions = listOf(u1, u2, u3)
+    val unions = listOf(u1, u2, u3, u4)
     val graph = FamilyGraph(persons, unions)
 
     val xSpacing = with(density) { 150.dp.toPx() }

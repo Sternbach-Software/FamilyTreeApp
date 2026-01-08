@@ -62,7 +62,7 @@ object LayoutEngine {
         // --- Cycle / Spouse Constraint Handling ---
         var changed = true
         var iterationCount = 0
-        val maxIterations = (persons.size * 2).coerceAtLeast(100) // Safety break
+        val maxIterations = (persons.size * 2).coerceAtLeast(100)
 
         while (changed && iterationCount < maxIterations) {
             changed = false
@@ -100,8 +100,6 @@ object LayoutEngine {
         children.forEach { childId ->
             val childGen = generation[childId] ?: 0
             if (childGen <= currentGen) {
-                // To avoid infinite recursion in direct parent-child loops, we could check here too
-                // But the outer loop limit handles the overall stability.
                 generation[childId] = currentGen + 1
                 propagateDown(childId, currentGen + 1, adjacency, generation)
             }
@@ -136,76 +134,81 @@ object LayoutEngine {
             }
         }
 
-        // 3. Barycenter / Averaging Passes
-        val iterations = 5
+        updateUnionPositions(graph)
+
+        // 3. Force-Directed Sweeps (Sugiyama-style)
+        val iterations = 10
         for (i in 0 until iterations) {
-            // Bottom-Up
+
+            // Down Sweep (Parents -> Children)
+            for (gen in 0..maxGen) {
+                val layer = layers[gen] ?: continue
+
+                layer.forEach { person ->
+                    val forces = mutableListOf<Float>()
+
+                    // Force from Parents
+                    val parentUnions = graph.unions.filter { it.childrenIds.contains(person.id) }
+                    parentUnions.forEach { forces.add(it.x) }
+
+                    // Force from Spouses
+                    person.spouseIds.forEach { spouseId ->
+                        val spouse = graph.persons[spouseId]
+                        if (spouse != null) forces.add(spouse.x)
+                    }
+
+                    if (forces.isNotEmpty()) {
+                        var sum = 0f
+                        forces.forEach { sum += it }
+                        person.x = sum / forces.size
+                    }
+                }
+
+                // Sort and Resolve
+                layer.sortBy { it.x }
+                resolveOverlaps(layer, xSpacing)
+                updateUnionPositions(graph)
+            }
+
+            // Up Sweep (Children -> Parents)
             for (gen in maxGen downTo 0) {
-                graph.unions.forEach { union ->
-                    val spouseGens = union.spouseIds.mapNotNull { graph.persons[it]?.generation }
-                    if (spouseGens.contains(gen)) {
-                        val children = union.childrenIds.mapNotNull { graph.persons[it] }
+                val layer = layers[gen] ?: continue
+
+                layer.forEach { person ->
+                    val forces = mutableListOf<Float>()
+
+                    // Force from Children
+                    val myUnions = graph.unions.filter { it.spouseIds.contains(person.id) }
+                    myUnions.forEach { u ->
+                        val children = u.childrenIds.mapNotNull { graph.persons[it] }
                         if (children.isNotEmpty()) {
                             var sumX = 0f
                             children.forEach { sumX += it.x }
-                            val avgChildrenX = sumX / children.size
-
-                            val spouses = union.spouseIds.mapNotNull { graph.persons[it] }
-                            val totalWidth = (spouses.size - 1) * xSpacing
-                            var startX = avgChildrenX - (totalWidth / 2)
-
-                            spouses.forEach { s ->
-                                s.x = startX
-                                startX += xSpacing
-                            }
+                            forces.add(sumX / children.size)
                         }
                     }
-                }
-                resolveOverlaps(layers[gen] ?: emptyList(), xSpacing)
-            }
 
-            // Top-Down
-            for (gen in 0..maxGen) {
-                graph.unions.forEach { union ->
-                    val spouses = union.spouseIds.mapNotNull { graph.persons[it] }
-                    if (spouses.isNotEmpty() && spouses.any { it.generation == gen }) {
-                        var sumX = 0f
-                        spouses.forEach { sumX += it.x }
-                        val unionX = sumX / spouses.size
+                    // Force from Spouses
+                    person.spouseIds.forEach { spouseId ->
+                        val spouse = graph.persons[spouseId]
+                        if (spouse != null) forces.add(spouse.x)
+                    }
 
-                        val children = union.childrenIds.mapNotNull { graph.persons[it] }
-                        if (children.isNotEmpty()) {
-                            val totalChildWidth = (children.size - 1) * xSpacing
-                            var startX = unionX - (totalChildWidth / 2)
-                            children.forEach { c ->
-                                c.x = startX
-                                startX += xSpacing
-                            }
-                        }
+                    if (forces.isNotEmpty()) {
+                        var sum = 0f
+                        forces.forEach { sum += it }
+                        person.x = sum / forces.size
                     }
                 }
-                resolveOverlaps(layers[gen + 1] ?: emptyList(), xSpacing)
+
+                // Sort and Resolve
+                layer.sortBy { it.x }
+                resolveOverlaps(layer, xSpacing)
+                updateUnionPositions(graph)
             }
         }
 
-        // Final Union Positioning
-        graph.unions.forEach { union ->
-            val spouses = union.spouseIds.mapNotNull { graph.persons[it] }
-            if (spouses.isNotEmpty()) {
-                var sumX = 0f
-                var sumY = 0f
-                spouses.forEach {
-                    sumX += it.x
-                    sumY += it.y
-                }
-                val avgX = sumX / spouses.size
-                val avgY = sumY / spouses.size
-                union.x = avgX
-                union.y = avgY
-            }
-        }
-
-        // Calculate total graph bounds
+        // Final Bounds Calculation
         var minX = Float.MAX_VALUE
         var maxX = Float.MIN_VALUE
         var minY = Float.MAX_VALUE
@@ -243,16 +246,48 @@ object LayoutEngine {
         }
     }
 
+    private fun updateUnionPositions(graph: FamilyGraph) {
+        graph.unions.forEach { union ->
+            val spouses = union.spouseIds.mapNotNull { graph.persons[it] }
+            if (spouses.isNotEmpty()) {
+                var sumX = 0f
+                var sumY = 0f
+                spouses.forEach {
+                    sumX += it.x
+                    sumY += it.y
+                }
+                val avgX = sumX / spouses.size
+                val avgY = sumY / spouses.size
+                union.x = avgX
+                union.y = avgY
+            }
+        }
+    }
+
     private fun resolveOverlaps(layer: List<Person>, minSpacing: Float) {
         if (layer.isEmpty()) return
-        val sorted = layer.sortedBy { it.x }
 
-        for (i in 0 until sorted.size - 1) {
-            val p1 = sorted[i]
-            val p2 = sorted[i+1]
+        // Calculate center before shift
+        var sumX = 0f
+        layer.forEach { sumX += it.x }
+        val oldCenter = sumX / layer.size
+
+        // 1. Left to Right pass (Compact)
+        for (i in 0 until layer.size - 1) {
+            val p1 = layer[i]
+            val p2 = layer[i+1]
             if (p2.x < p1.x + minSpacing) {
                 p2.x = p1.x + minSpacing
             }
         }
+
+        // Calculate center after shift
+        sumX = 0f
+        layer.forEach { sumX += it.x }
+        val newCenter = sumX / layer.size
+
+        // Re-center
+        val shift = oldCenter - newCenter
+        layer.forEach { it.x += shift }
     }
 }

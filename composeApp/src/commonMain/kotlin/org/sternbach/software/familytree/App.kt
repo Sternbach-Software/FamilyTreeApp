@@ -18,7 +18,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import familytree.composeapp.generated.resources.Res
 import familytree.composeapp.generated.resources.compose_multiplatform
-import org.sternbach.software.familytree.v3.FamilyTreePreview
+import sternbach.software.familytreecompose.FamilyTreePreview
 
 @Composable
 @Preview
