@@ -18,6 +18,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import familytree.composeapp.generated.resources.Res
 import familytree.composeapp.generated.resources.compose_multiplatform
+import org.sternbach.software.familytree.v3.FamilyTreePreview
 
 @Composable
 @Preview
@@ -30,7 +31,7 @@ fun App() {
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Hello")
+            FamilyTreePreview()
         }
     }
 }
