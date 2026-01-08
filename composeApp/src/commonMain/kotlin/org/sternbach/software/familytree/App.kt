@@ -18,12 +18,42 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 
 import familytree.composeapp.generated.resources.Res
 import familytree.composeapp.generated.resources.compose_multiplatform
+import org.folg.gedcom.parser.ModelParser
+import sternbach.software.familytreecompose.FamilyGraph
 import sternbach.software.familytreecompose.FamilyTreePreview
+import sternbach.software.familytreecompose.LayoutEngine
+import sternbach.software.familytreecompose.LazyFamilyTree
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 
 @Composable
 @Preview
 fun App() {
     MaterialTheme {
+        var graph by remember { mutableStateOf<FamilyGraph?>(null) }
+        val density = LocalDensity.current
+
+        val launcher = rememberFilePicker { content ->
+            if (content != null) {
+                try {
+                    val parser = ModelParser()
+                    val gedcom = parser.parseGedcom(content.lineSequence())
+                    if (gedcom != null) {
+                        val newGraph = GedcomMapper.mapGedcomToFamilyGraph(gedcom)
+
+                        val xSpacing = with(density) { 150.dp.toPx() }
+                        val ySpacing = with(density) { 160.dp.toPx() }
+                        LayoutEngine.calculateLayout(newGraph, xSpacing, ySpacing)
+
+                        graph = newGraph
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Handle error (show snackbar or dialog)
+                }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .background(MaterialTheme.colorScheme.primaryContainer)
@@ -31,7 +61,16 @@ fun App() {
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            FamilyTreePreview()
+            Button(onClick = { launcher.launch() }) {
+                Text("Import GEDCOM")
+            }
+
+            val currentGraph = graph
+            if (currentGraph != null) {
+                LazyFamilyTree(currentGraph)
+            } else {
+                FamilyTreePreview()
+            }
         }
     }
 }
