@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -45,9 +46,11 @@ class FamilyTreeState(
     var scale by mutableStateOf(initialScale)
     var offset by mutableStateOf(initialOffset)
 
-    fun onTransform(zoomChange: Float, panChange: Offset) {
-        scale = (scale * zoomChange).coerceIn(0.1f, 3f)
-        offset += panChange
+    fun onTransform(centroid: Offset, zoomChange: Float, panChange: Offset) {
+        val newScale = (scale * zoomChange).coerceIn(0.1f, 3f)
+        val scaleChange = newScale / scale
+        offset = (offset - centroid) * scaleChange + centroid + panChange
+        scale = newScale
     }
 }
 
@@ -85,34 +88,34 @@ fun LazyFamilyTree(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        state.onTransform(zoom, pan)
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        state.onTransform(centroid, zoom, pan)
                     }
                 }
         ) {
-            // 1. Drawing Layer (Canvas)
-            // We apply transformations to the Canvas itself
-            Canvas(modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer(
-                    scaleX = state.scale,
-                    scaleY = state.scale,
-                    translationX = state.offset.x,
-                    translationY = state.offset.y
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = state.scale,
+                        scaleY = state.scale,
+                        translationX = state.offset.x,
+                        translationY = state.offset.y,
+                        transformOrigin = TransformOrigin(0f, 0f)
+                    )
             ) {
-                drawUnionLines(graph, visibleRect, nodeWidthPx, nodeHeightPx)
-            }
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    drawUnionLines(graph, visibleRect, nodeWidthPx, nodeHeightPx)
+                }
 
-            // 2. Node Layer (Subcomposition)
-            FamilyTreeSubcomposer(
-                graph = graph,
-                visibleRect = visibleRect,
-                state = state,
-                nodeWidth = nodeWidth,
-                nodeHeight = nodeHeight,
-                nodeContent = nodeContent
-            )
+                FamilyTreeSubcomposer(
+                    graph = graph,
+                    visibleRect = visibleRect,
+                    nodeWidth = nodeWidth,
+                    nodeHeight = nodeHeight,
+                    nodeContent = nodeContent
+                )
+            }
         }
     }
 }
@@ -121,7 +124,6 @@ fun LazyFamilyTree(
 private fun FamilyTreeSubcomposer(
     graph: FamilyGraph,
     visibleRect: Rect,
-    state: FamilyTreeState,
     nodeWidth: Dp,
     nodeHeight: Dp,
     nodeContent: @Composable (Person) -> Unit
@@ -148,11 +150,7 @@ private fun FamilyTreeSubcomposer(
         layout(constraints.maxWidth, constraints.maxHeight) {
             nodePlaceables.forEach { (person, placeables) ->
                 placeables.forEach { placeable ->
-                    // Map graph coordinates to screen coordinates
-                    val screenX = (person.x * state.scale) + state.offset.x
-                    val screenY = (person.y * state.scale) + state.offset.y
-
-                    placeable.placeRelative(screenX.roundToInt(), screenY.roundToInt())
+                    placeable.place(person.x.roundToInt(), person.y.roundToInt())
                 }
             }
         }
